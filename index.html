@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>MineSweeper - Free Minesweeper</title>
+    <link id="icon" rel="icon" href="images/bomb.png">
+</head>
+<body id="menu" style="height:100px; display:block; background-color:#D3D3D3;" oncontextmenu="return false;">
+    <div id="modeSelect" style="margin:20px;">
+        <button onclick="dropDown()" class="dropbtn">Select The Difficulty</button>
+        <div id="modeDropdown" class="dropdown-content" style="display:block; position:absolute;">
+                <div class="modeElement" id="easy" onclick="setGameMode('easy')" >Easy</div>
+                <div class="modeElement" id="medium" onclick="setGameMode('medium')" >Medium</div>
+                <div class="modeElement" id="expert" onclick="setGameMode('expert')" >Expert</div>
+                <div class="modeElement" id="custom" onclick="setGameMode('custom')" >Custom</div>
+        </div>
+        <div id="custom-table" style="display:block">
+            <input type="text" id = "rows" placeholder="Rows">
+            <input type="text" id = "colums" placeholder="Colums">        
+            <input type="text" id = "bombs" placeholder="Bombs">
+            <button id="drawBoard" >Create Board</button>
+        </div>
+    </div>
+
+
+    <br>
+    <br>
+    <br>
+
+
+    <div id="game-info" style="display:flex; float:left;">
+        <div class="bombs-left-text">
+            <p style=" margin:0%; width: 81px;">Bombs Left:</p>
+        </div>
+        <div style="margin-left: 2%"></div>
+        <div id="bombs-left">
+            <p style="border: 1px solid #000; word-wrap:break-word; margin:0%;">123</p>
+        </div>
+        <div style="margin-left: 40%; margin-right: 40%; ">
+            <button onclick="restart()">Restart</button>
+        </div>
+        <div class="time-text">
+            <p style="margin:0%">Time:</p>
+        </div>
+        <div style="margin-left: 2%"></div>
+        <div id="time">
+            <p style="border: 1px solid #000; word-wrap:break-word; margin:0%;">123</p>
+        </div>
+    </div>
+    
+    <br>
+    <br>
+    
+    <div id="board" style="margin:20px; margin-top:100px; display:block; float:left; box-shadow: 5px 5px 2.5px #888888;">
+
+    </div>
+
+    <script>        
+        var timer; // function time counter
+        var firstClick = true;
+
+        var grid = [];  
+        var gridHeight = 0;        
+        var gridWidth = 0;
+        var bombs = 0;
+
+        var bombSet = false;//if number of bombs is been set or it has to be got in the value
+        var bombsLeft = 0;//bombs that have not been flagged
+        var board = document.getElementById('board');
+        var gameInfo = document.getElementById('game-info');
+        var timerText = document.getElementById('time');
+        var bombsLeftText = document.getElementById('bombs-left');
+        var revealsNeeded = 0;//Tiles-bombs
+        var actualReveals = 0;//Tiles that are not bombs revealed
+        var time = 0;//time since the first click        
+        var mode;
+        var endGame = false;
+
+        //Does nto work in edge
+        try{
+            var urlGot = new URL(window.location);
+            var URLgameMode = urlGot.searchParams.get("gamemode");
+
+            console.log(URLgameMode);
+            if(URLgameMode == "easy") setGameMode("easy");
+            else if (URLgameMode == "medium") setGameMode("medium");
+            else if (URLgameMode == "expert") setGameMode("expert");
+            else setGameMode("easy");
+        }catch(err){
+            setGameMode("easy");
+        }
+        
+
+        function dropDown(){
+            let dd = document.getElementById("modeDropdown");
+            //document.getElementById("custom-table").style.display="none";//remove custom selector
+            if(dd.style.display != "block"){
+                dd.style.display="block";
+            }else{
+                dd.style.display="none";
+            }            
+        }
+
+        function setGameMode(gameMode){
+            bombSet = true;
+            mode = gameMode;
+            switch(gameMode){
+                case "easy":
+                    console.log("EASY MODE SET");
+                    bombs = 10;
+                    drawBoard(8,8);
+                break;
+                case "medium":
+                    console.log("MEDIUM MODE SET");
+                    bombs = 40;
+                    drawBoard(16,16);
+                break;
+                case "expert":
+                    console.log("EXPERT MODE SET");
+                    bombs = 99;
+                    drawBoard(30,16);
+                break;
+                case "custom":
+                    console.log("CUSTOM MODE SET");
+
+                    bombSet = false;
+                    document.getElementById("custom-table").style.display="block";                    
+                    //Set Buttons
+                    document.getElementById("drawBoard").addEventListener("click", function() {
+                        drawBoard(document.getElementById("colums").value,document.getElementById("rows").value);
+                    }, false);
+                break;
+            }
+            let dd = document.getElementById("modeDropdown");
+            dd.style.display="none";
+        }
+
+        //Draw all the cells with size
+        function drawBoard(x,y){                         
+            document.getElementById("custom-table").style.display="none";//remove custom selector
+            //Clean for new game
+            grid.length = 0;
+            actualReveals = 0;
+            while(board.hasChildNodes() ){ 
+                board.removeChild(board.lastChild);
+            }   
+            
+            if(x*y > 8000){
+                alert("Board too big. Max cells is 8000");
+                setGameMode("easy");
+                setGameMode("custom");
+                return;
+            }
+
+            gridWidth = x;
+            gridHeight = y;
+
+            for(let y = 0; y < gridHeight; y++)
+            {                    
+                grid.push([]);
+                for(let x = 0; x < gridWidth; x++)
+                {
+                    (function(){
+                        var cellDisplay = document.createElement('div');            
+                        cellDisplay.id="cellDisplay";
+                        cellDisplay.style.display="block";
+                        cellDisplay.style.height = cellDisplay.style.width = "16px";
+                        cellDisplay.style.cssFloat = "left";     
+                        cellDisplay.style.cursor = "pointer";
+                        cellDisplay.style.marginRight = "1px";    
+
+                        var img = document.createElement('img');
+                        img.src = "images/facingDown.png";
+                        img.border ="0";
+                        img.alt="?";
+                        img.style.height = "16px";
+                        img.style.width = "16px";
+                        
+                        var cell = {
+                            x : x,
+                            y : y,
+                            isFlagged : false,
+                            isRevealed : false,
+                            isUnknow : false,
+                            isBomb : false,
+                            neighbors : 0,
+                            cellImg : img
+                        };
+
+                        //Set interaction
+                        cellDisplay.addEventListener("mousedown", function(event) {
+                            click(event,cell);
+                        });
+
+                        cellDisplay.appendChild(img);
+                        board.appendChild(cellDisplay);                   
+
+                        grid[y].push(cell);
+                    }());
+                }
+                let lb = document.createElement('br');
+                board.appendChild(lb);               
+            }  
+                             
+            // Center the board
+            let boardWidth = board.offsetWidth;
+            let gameInfoWidth = gameInfo.offsetWidth;
+            let totalWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+
+            board.style.marginLeft = (((totalWidth-boardWidth)/2)-20).toString() + "px";
+            gameInfo.style.marginLeft = (((totalWidth-gameInfoWidth)/2)-140).toString() + "px";
+            //Set cell values
+            fillBoard();     
+        }
+
+        //Place bombs and neighbors
+        function fillBoard(){  
+            if(!bombSet){         
+                bombs = document.getElementById("bombs").value;            
+                if(bombs == '') bombs = Math.floor((Math.random()*gridHeight*gridWidth*0.10)+(gridHeight*gridWidth*0.15)); 
+                else if(bombs >= gridHeight*gridWidth*0.35){ 
+                    alert("To many bombs. Max bombs is 35% of the cells");
+                    setGameMode("easy");
+                    setGameMode("custom");
+                    return;
+                }
+            }
+            bombsLeft = bombs; //Initialize bombs not flaged
+            revealsNeeded = (gridHeight*gridWidth)-bombs;
+              
+
+            for(let i = 0; i < bombs;i++){
+                putBomb();     
+            }
+            
+            time = 0;
+            timerText.textContent = time.toString();
+            bombsLeftText.textContent = bombsLeft.toString();
+        }
+
+        //Use this function to prevent bomb placing
+        function isRevealedTo(bool,cellInfo){
+            let ny = cellInfo.y;
+            let nx = cellInfo.x;
+            for(let j = ny-2; j <= ny+2; j++){                           
+                for(let k = nx-2; k <= nx+2; k++){ 
+                    if(notOutOfBonds(j,k)){
+                        grid[ny][nx].isRevealed = bool;                                        
+                    }
+                }
+            }
+        }
+        
+        function click(event,cellInfo){
+
+            event = event || window.event;            
+
+            if(firstClick){
+                timeCount();
+            }
+
+            if(event.button == 0 && !cellInfo.isFlagged && !cellInfo.isUnknow){        
+                
+                if(!cellInfo.isRevealed){
+                    if(firstClick){ 
+                        isRevealedTo(true,cellInfo);                           
+                        let ny = cellInfo.y;
+                        let nx = cellInfo.x;
+                        for(let j = ny-1; j <= ny+1; j++){                           
+                            for(let k = nx-1; k <= nx+1; k++){ 
+                                if(notOutOfBonds(j,k) && grid[j][k].isBomb){
+                                    relocateBomb(grid[j][k]);                                        
+                                }
+                            }
+                        }
+                        isRevealedTo(false,cellInfo);
+                    }
+                    reveal(cellInfo);            
+                    
+                }else if(!cellInfo.isBomb){
+                    //Reveal les del voltant si apretes a una revealed que jha te marcadas las minas
+                    revealNeighbors(cellInfo);
+                }
+                                        
+                firstClick = false;
+            }
+            else if(event.button == 2 && !cellInfo.isRevealed){
+                //flag
+                if(!cellInfo.isFlagged && !cellInfo.isUnknow){
+                    bombsLeft--;//Flag Bomb
+                    cellInfo.isFlagged = true;
+                    cellInfo.isUnknow = false;
+                    cellInfo.cellImg.src = "images/flagged.png";
+                }else if(!cellInfo.isUnknow){
+                    bombsLeft++;//Unflag Bomb
+                    cellInfo.isUnknow = true;
+                    cellInfo.isFlagged = false;
+                    cellInfo.cellImg.src = "images/unknown.png";
+                }else{
+                    cellInfo.isUnknow = false;
+                    cellInfo.isFlagged = false;
+                    cellInfo.cellImg.src = "images/facingDown.png";
+                }
+                    
+                bombsLeftText.textContent = bombsLeft.toString();
+            }
+        }
+
+        //Revewal all neighbours if all flags set
+        function revealNeighbors(cellInfo){
+            let neighbors = cellInfo.neighbors;
+            let flaggsFound = 0;
+            let ny = cellInfo.y;
+            let nx = cellInfo.x;
+
+            //Mirar cuantes bombes marcades te al voltant                                                     
+            for(let j = ny-1; j <= ny+1 && flaggsFound < neighbors; j++){                           
+                for(let k = nx-1; k <= nx+1 && flaggsFound < neighbors; k++){ 
+                    if(notOutOfBonds(j,k) && grid[j][k].isFlagged){
+                        flaggsFound++;
+                    }
+                }
+            }
+
+            if(flaggsFound >= neighbors){
+                for(let j = ny-1; j <= ny+1; j++){
+                    for(let k = nx-1; k <= nx+1; k++){
+                        if(notOutOfBonds(j,k)){
+                            let cell = grid[j][k];
+                            if(!cell.isRevealed && !cell.isFlagged && !cell.isUnknow){                                            
+                                if(cell.isBomb){
+                                    cell.isRevealed = true;
+                                    cell.cellImg.src = "images/bomb.png";
+                                    gameOver();
+                                }else{
+                                    reveal(cell);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function reveal(cellInfo){
+            if(actualReveals == revealsNeeded) win();
+            if(cellInfo.isBomb && !cellInfo.isFlagged && !cellInfo.isUnknow){
+                cellInfo.isRevealed = true;
+                cellInfo.cellImg.src = "images/bomb.png";
+                gameOver();
+            }else{
+                ++actualReveals; //1morerevealed            
+                //if(actualReveals >= revealsNeeded) win(); //Check if win
+
+                if(!cellInfo.isFlagged && !cellInfo.isUnknow){
+                    cellInfo.isRevealed = true;                        
+
+                    if(cellInfo.neighbors == 0 && !cellInfo.isBomb){
+                        let x = cellInfo.x;
+                        let y = cellInfo.y;
+
+                        cellInfo.cellImg.src = "images/0.png";                        
+
+                        //recursivity
+                        for(let i = y-1; i <= y+1; i++){
+                            for(let j = x-1; j <= x+1; j++){                        
+                                if( notOutOfBonds(i,j) && !(i==y && j==x) && !grid[i][j].isRevealed){ 
+                                    reveal(grid[i][j]);
+                                }
+                            }
+                        }
+                    }else{
+                        switch(cellInfo.neighbors){
+                            case 1:
+                                cellInfo.cellImg.src = "images/1.png";
+                            break;
+                            case 2:
+                                cellInfo.cellImg.src = "images/2.png";
+                            break;
+                            case 3:
+                                cellInfo.cellImg.src = "images/3.png";
+                            break;
+                            case 4:
+                                cellInfo.cellImg.src = "images/4.png";
+                            break;
+                            case 5:
+                                cellInfo.cellImg.src = "images/5.png";
+                            break;
+                            case 6:
+                                cellInfo.cellImg.src = "images/6.png";
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        function relocateBomb(cellInfo){
+            //Relocate the bombe more away than x+1,x-1,y+1,y-1             
+            cellInfo.isBomb = false;   
+            let ny = cellInfo.y;
+            let nx = cellInfo.x;
+            for(let j = ny-1; j <= ny+1; j++){                           
+                for(let k = nx-1; k <= nx+1; k++){ 
+                    if(notOutOfBonds(j,k) && grid[j][k].neighbors > 0){
+                        grid[j][k].neighbors--;
+                    }                   
+                }
+            }
+            putBomb();
+        }
+
+        //Sets bomb any point
+        function putBomb(){
+            let y = Math.floor(Math.random()*gridHeight);
+            let x = Math.floor(Math.random()*gridWidth); 
+            
+            let cellInfo = grid[y][x];
+
+            //if awayFrom is not null set the bomb more away of x+1 x-1 y+1 and y-1
+            if(!cellInfo.isBomb && !cellInfo.isRevealed){
+                cellInfo.isBomb = true;
+                let nx=cellInfo.x;
+                let ny=cellInfo.y;
+                
+                for(let j = ny-1; j <= ny+1; j++){
+                    for(let k = nx-1; k <= nx+1; k++){
+                        if(notOutOfBonds(j,k)){
+                            grid[j][k].neighbors += 1;
+                        }
+                    }
+                }                    
+            }else{
+                putBomb();
+            }
+        }
+        
+
+        function notOutOfBonds(y,x){
+            return ((y < gridHeight && y > -1) && (x < gridWidth && x > -1))
+        }
+
+        function timeCount(){
+            time++;            
+            timer = window.setTimeout(timeCount,1000);
+            timerText.textContent = time.toString();
+        }
+
+        function win(){
+            if(!endGame){
+                window.open("win.html?gamemode="+mode+"&time="+time); //Winer page
+                endGame = true;
+            } 
+        }   
+
+        function showAllBombs(){
+            for(let y = 0; y < gridHeight; y++)
+            {                 
+                for(let x = 0; x < gridWidth; x++)
+                {
+                    let cellInfo = grid[y][x];
+                    if(cellInfo.isBomb){
+                        cellInfo.isRevealed = true;
+                        cellInfo.cellImg.src = "images/bomb.png";
+                    }
+                }
+            }
+        }
+
+        function gameOver(){        
+            endGame = true;
+            showAllBombs();
+        }
+
+        function restart(){
+            console.log("Restart");
+            window.clearTimeout(timer);
+            time = 0;            
+            bombSet = false; //Bombs are set, bombSet = false for next game
+            firstClick = true;
+            endGame = false;
+
+            setGameMode(mode);
+        }
+    </script>
+</body>
+</html>

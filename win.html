@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>You Won</title>    
+</head>
+<body>    
+    <h1>Winner!</h1>
+    <script>
+    var url = new URL(window.location.href);
+    var gameMode = url.searchParams.get("gamemode");
+    var time = url.searchParams.get("time");
+
+    document.write("<h2> You beat minesweeper in "+gameMode+" mode in "+time+" seconds </h2>")
+
+    function restart(){
+        window.open("index.html?gamemode="+gameMode);
+        window.close();
+    }   
+    </script>
+    <button onclick="restart()">Restart</button>
+</body>
+</html>

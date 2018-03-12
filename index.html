@@ -345,7 +345,7 @@
         }
 
         function reveal(cellInfo){
-            if(actualReveals == revealsNeeded) win();
+            if(actualReveals == revealsNeeded-1) win();
             if(cellInfo.isBomb && !cellInfo.isFlagged && !cellInfo.isUnknow){
                 cellInfo.isRevealed = true;
                 cellInfo.cellImg.src = "images/bomb.png";
